@@ -12,9 +12,14 @@ const ort = require("onnxruntime-web");
 import npyjs from "npyjs";
 
 // Define image, embedding and model paths
-const IMAGE_PATH = "/assets/data/testing.jpg";
+const IMAGE_PATH = "/assets/data/spat_image.png";
 const IMAGE_EMBEDDING = "/assets/data/testing_embedding.npy";
 const MODEL_DIR = "/assets/data/dodo.onnx";
+
+interface Coordinate {
+  x: number;
+  y: number;
+}
 
 const App = () => {
   const {
@@ -24,6 +29,9 @@ const App = () => {
   } = useContext(AppContext)!;
   const [model, setModel] = useState<InferenceSession | null>(null); // ONNX model
   const [tensor, setTensor] = useState<Tensor | null>(null); // Image embedding tensor
+  const [coordinates, setCoordinates] = useState<Coordinate[] | null | []>(
+    null
+  );
 
   // The ONNX model expects the input to be rescaled to 1024.
   // The modelScale state variable keeps track of the scale values.
@@ -98,7 +106,7 @@ const App = () => {
       )
         return;
       else {
-        // Preapre the model input in the correct format for SAM.
+        // Prepare the model input in the correct format for SAM.
         // The modelData function is from onnxModelAPI.tsx.
         const feeds = modelData({
           clicks,
@@ -109,18 +117,50 @@ const App = () => {
         // Run the SAM ONNX model with the feeds returned from modelData()
         const results = await model.run(feeds);
         const output = results[model.outputNames[0]];
+
         // The predicted mask returned from the ONNX model is an array which is
         // rendered as an HTML image using onnxMaskToImage() from maskUtils.tsx.
-        setMaskImg(
-          onnxMaskToImage(output.data, output.dims[2], output.dims[3])
+        // findCoordinates(output);
+        const { imageDataToImage, coordinates: coco } = onnxMaskToImage(
+          output.data,
+          output.dims[2],
+          output.dims[3]
         );
+        const cocoClone: Coordinate[] = coco;
+        setMaskImg(imageDataToImage);
+        // setCoordinates(cocoClone);
+        // console.log(`this is coordinates: ${cocoClone}`);
       }
     } catch (e) {
       console.log(e);
     }
   };
 
-  return <Stage />;
+  const loadEmbedding = async () => {
+    return Promise.resolve(loadNpyTensor(IMAGE_EMBEDDING, "float32")).then(
+      (embedding) => embedding
+    );
+  };
+
+  const findCoordinates = async (output: Array<number>) => {
+    const xCoordinates = output.map((item: Object) => {
+      console.log(item);
+    });
+
+    // const current = await InferenceSession.create(MODEL_DIR);
+    // const image = await loadImage(new URL(IMAGE_PATH, location.origin));
+    // const embedding = await loadEmbedding();
+  };
+
+  return (
+    <Stage
+      coordinates={coordinates}
+      scale={{
+        height: modelScale?.height,
+        width: modelScale?.width,
+      }}
+    />
+  );
 };
 
 export default App;

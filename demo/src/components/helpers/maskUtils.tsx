@@ -9,7 +9,6 @@ function arrayToImageData(input: any, width: number, height: number) {
   const [r, g, b, a] = [0, 114, 189, 255]; // the masks's blue color
   const arr = new Uint8ClampedArray(4 * width * height).fill(0);
   for (let i = 0; i < input.length; i++) {
-
     // Threshold the onnx model mask prediction at 0.0
     // This is equivalent to thresholding the mask using predictor.model.mask_threshold
     // in python
@@ -41,7 +40,31 @@ function imageDataToCanvas(imageData: ImageData) {
   return canvas;
 }
 
+function findCoordinates(imageData: any) {
+  const coordinates = [];
+
+  for (let i = 0; i < imageData.length; i += 2) {
+    const x = imageData[i];
+    const y = imageData[i + 1];
+    coordinates.push({ x, y });
+  }
+  // console.log(imageData);
+
+  return coordinates;
+  // return [];
+}
+
 // Convert the onnx model mask output to an HTMLImageElement
 export function onnxMaskToImage(input: any, width: number, height: number) {
-  return imageDataToImage(arrayToImageData(input, width, height));
+  const arrayImData = arrayToImageData(input, width, height);
+  interface Coordinate {
+    x: number;
+    y: number;
+  }
+  [];
+
+  return {
+    imageDataToImage: imageDataToImage(arrayImData),
+    coordinates: findCoordinates(input),
+  };
 }

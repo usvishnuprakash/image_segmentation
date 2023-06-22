@@ -49,22 +49,22 @@ const Tool = ({ handleMouseMove }: ToolProps) => {
     <>
       {image && (
         <img
+          alt="image not loaded"
           onMouseMove={handleMouseMove}
           onMouseOut={() => _.defer(() => setMaskImg(null))}
           onTouchStart={handleMouseMove}
           src={image.src}
           className={`${
             shouldFitToWidth ? "w-full" : "h-full"
-          } ${imageClasses}`}
-        ></img>
+          } ${imageClasses}`}></img>
       )}
       {maskImg && (
         <img
+          alt="image not loaded"
           src={maskImg.src}
           className={`${
             shouldFitToWidth ? "w-full" : "h-full"
-          } ${maskImageClasses}`}
-        ></img>
+          } ${maskImageClasses}`}></img>
       )}
     </>
   );

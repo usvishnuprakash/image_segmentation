@@ -29,7 +29,7 @@ def show_anns(anns):
     ax.imshow(img)
 
 
-image = cv2.imread('personalData/testing.jpg')
+image = cv2.imread('personalData/spat_image.png')
 
 
 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
