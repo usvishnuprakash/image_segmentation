@@ -28,12 +28,13 @@ const Stage = ({
 }) => {
   const {
     clicks: [, setClicks],
+    clickedPoint: [, setClick],
     image: [image],
   } = useContext(AppContext)!;
 
   const getClick = (x: number, y: number): modelInputProps => {
     const clickType = 1;
-    return { x, y, clickType };
+    return { x, y, clickType, width: null, height: null };
   };
 
   const maskCanvasRef = useRef(null);
@@ -66,7 +67,7 @@ const Stage = ({
         }
         ctx.drawImage(ima, 0, 0);
         maskImage();
-        console.log("draw one time ");
+        // console.log("draw one time ");
       }
     }
   }, [coordinates]);
@@ -75,7 +76,7 @@ const Stage = ({
   // scale of the image. Update the state of clicks with setClicks to trigger
   // the ONNX model to run and generate a new mask via a useEffect in App.tsx
   const handleMouseMove = _.throttle((e: any) => {
-    console.log("hello world");
+    // console.log("e", e);
     let el = e.nativeEvent.target;
     const rect = el.getBoundingClientRect();
     let x = e.clientX - rect.left;
@@ -87,13 +88,28 @@ const Stage = ({
     if (click) setClicks([click]);
   }, 15);
 
+  const handleSelectOnClick = _.throttle((e: any) => {
+    let el = e.nativeEvent.target;
+    const rect = el.getBoundingClientRect();
+    let x = e.clientX - rect.left;
+    let y = e.clientY - rect.top;
+    const imageScale = image ? image.width / el.offsetWidth : 1;
+    x *= imageScale;
+    y *= imageScale;
+    const click = getClick(x, y);
+    if (click) setClick(click);
+  }, 2);
+
   const flexCenterClasses = "flex items-center justify-center";
   return (
     <>
       {" "}
       <div className={`${flexCenterClasses} w-full h-full`}>
         <div className={`${flexCenterClasses} relative w-[90%] h-[90%]`}>
-          <Tool handleMouseMove={handleMouseMove} />
+          <Tool
+            handleMouseMove={handleMouseMove}
+            handleSelectOnClick={handleSelectOnClick}
+          />
         </div>
       </div>
       <div>

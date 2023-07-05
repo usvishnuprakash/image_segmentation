@@ -12,6 +12,10 @@ interface contextProps {
     clicks: modelInputProps[] | null,
     setClicks: (e: modelInputProps[] | null) => void
   ];
+  clickedPoint: [
+    click: modelInputProps | null,
+    setClick: (e: modelInputProps | null) => void
+  ];
   image: [
     image: HTMLImageElement | null,
     setImage: (e: HTMLImageElement | null) => void

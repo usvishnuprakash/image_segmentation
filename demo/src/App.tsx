@@ -1,20 +1,39 @@
 import { InferenceSession, Tensor } from "onnxruntime-web";
 import React, { useContext, useEffect, useState } from "react";
+import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import "./assets/scss/App.scss";
 import { handleImageScale } from "./components/helpers/scaleHelper";
-import { modelScaleProps } from "./components/helpers/Interfaces";
-import { onnxMaskToImage } from "./components/helpers/maskUtils";
-import { modelData } from "./components/helpers/onnxModelAPI";
+import {
+  modelScaleProps,
+  multiMaskModelScaleProps,
+} from "./components/helpers/Interfaces";
+import {
+  onnxMaskToContours,
+  onnxMaskToImage,
+} from "./components/helpers/maskUtils";
+import {
+  modelData,
+  multiMaskModelData,
+} from "./components/helpers/onnxModelAPI";
 import Stage from "./components/Stage";
 import AppContext from "./components/hooks/createContext";
+
+import * as ImageHelper from "./components/helpers/ImageHelper";
 const ort = require("onnxruntime-web");
 /* @ts-ignore */
 import npyjs from "npyjs";
+import NewStage from "./components/NewStage";
+import {
+  findIouScore,
+  findOptimalThreshold,
+  predictSegmentScores,
+} from "./utilities/FunctionalUtilities";
+import { segmentProbability } from "./utilities/segmentProbability";
 
 // Define image, embedding and model paths
 const IMAGE_PATH = "/assets/data/spat_image.png";
 const IMAGE_EMBEDDING = "/assets/data/testing_embedding.npy";
-const MODEL_DIR = "/assets/data/dodo.onnx";
+const MODEL_DIR = "/assets/data/spatImageWithExtraDataWithSingleMask.onnx";
 
 interface Coordinate {
   x: number;
@@ -26,6 +45,7 @@ const App = () => {
     clicks: [clicks],
     image: [, setImage],
     maskImg: [, setMaskImg],
+    clickedPoint: [click],
   } = useContext(AppContext)!;
   const [model, setModel] = useState<InferenceSession | null>(null); // ONNX model
   const [tensor, setTensor] = useState<Tensor | null>(null); // Image embedding tensor
@@ -33,9 +53,26 @@ const App = () => {
     null
   );
 
+  const [prevMaskData, setPrevMaskData] = useState<
+    | string[]
+    | Uint8Array
+    | Float32Array
+    | Int8Array
+    | Uint16Array
+    | Int16Array
+    | Int32Array
+    | BigInt64Array
+    | Float64Array
+    | Uint32Array
+    | BigUint64Array
+    | null
+  >(null);
+
   // The ONNX model expects the input to be rescaled to 1024.
   // The modelScale state variable keeps track of the scale values.
   const [modelScale, setModelScale] = useState<modelScaleProps | null>(null);
+  const [multiMaskModelScaleProps, setMultiMaskModelScaleProps] =
+    useState<multiMaskModelScaleProps | null>(null);
 
   // Initialize the ONNX model. load the image, and load the SAM
   // pre-computed image embedding
@@ -69,10 +106,25 @@ const App = () => {
       img.src = url.href;
       img.onload = () => {
         const { height, width, samScale } = handleImageScale(img);
+        const {
+          height: mh,
+          width: mw,
+          scale,
+          uploadScale,
+        } = ImageHelper.handleImageScale(img);
         setModelScale({
           height: height, // original image height
           width: width, // original image width
           samScale: samScale, // scaling factor for image which has been resized to longest side 1024
+        });
+        setMultiMaskModelScaleProps({
+          onnxScale: scale / uploadScale,
+          maskWidth: width * uploadScale,
+          maskHeight: mh * uploadScale,
+          scale: scale,
+          uploadScale: uploadScale,
+          width: mw,
+          height: mh,
         });
         img.width = width;
         img.height = height;
@@ -94,7 +146,64 @@ const App = () => {
   // Run the ONNX model every time clicks has changed
   useEffect(() => {
     runONNX();
+    runMultiMaskModel();
   }, [clicks]);
+
+  useEffect(() => {
+    runClickOnnx();
+  }, [click]);
+
+  const runMultiMaskModel = async () => {
+    try {
+      if (
+        model === null ||
+        clicks === null ||
+        tensor === null ||
+        multiMaskModelScaleProps === null
+      ) {
+        return;
+      }
+      const feeds = multiMaskModelData({
+        clicks,
+        tensor,
+        modelScale: multiMaskModelScaleProps,
+        last_pred_mask: null, // Only 1 click allowed, so no last predicted mask exists
+      });
+      if (feeds === undefined) return;
+
+      const results = await model.run(feeds);
+      // console.log(feeds);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const runClickOnnx = async () => {
+    try {
+      if (
+        model === null ||
+        click === null ||
+        tensor === null ||
+        modelScale === null
+      ) {
+        return;
+      }
+      // Prepare the model input in the correct format for SAM.
+      // The modelData function is from onnxModelAPI.tsx.
+      const feeds = modelData({
+        clicks: [click],
+        tensor,
+        modelScale,
+      });
+
+      if (feeds === undefined) return;
+
+      // Run the SAM ONNX model with the feeds returned from modelData()
+      const results = await model.run(feeds);
+
+      segmentProbability(click, results, feeds, "click");
+    } catch (error) {}
+  };
 
   const runONNX = async () => {
     try {
@@ -113,23 +222,31 @@ const App = () => {
           tensor,
           modelScale,
         });
+
         if (feeds === undefined) return;
         // Run the SAM ONNX model with the feeds returned from modelData()
         const results = await model.run(feeds);
-        const output = results[model.outputNames[0]];
 
+        // masking
+
+        const output = results[model.outputNames[0]];
+        // console.log(output.data);
         // The predicted mask returned from the ONNX model is an array which is
         // rendered as an HTML image using onnxMaskToImage() from maskUtils.tsx.
         // findCoordinates(output);
+
         const { imageDataToImage, coordinates: coco } = onnxMaskToImage(
           output.data,
           output.dims[2],
           output.dims[3]
         );
-        const cocoClone: Coordinate[] = coco;
+        // onnxMaskToContours(output.data, output.dims[2], output.dims[3]);
+
         setMaskImg(imageDataToImage);
+
+        // segmentProbability(clicks[0], results, feeds, "hover");
+
         // setCoordinates(cocoClone);
-        // console.log(`this is coordinates: ${cocoClone}`);
       }
     } catch (e) {
       console.log(e);
@@ -144,7 +261,7 @@ const App = () => {
 
   const findCoordinates = async (output: Array<number>) => {
     const xCoordinates = output.map((item: Object) => {
-      console.log(item);
+      // console.log(item);
     });
 
     // const current = await InferenceSession.create(MODEL_DIR);
@@ -163,4 +280,20 @@ const App = () => {
   );
 };
 
-export default App;
+const DefaultApp = () => {
+  return (
+    <Routes>
+      <Route path="/" element={<App />} />
+      {/* <Route
+        path="/"
+        element={
+          <div>
+            <NewStage />
+          </div>
+        }
+      /> */}
+    </Routes>
+  );
+};
+
+export default DefaultApp;

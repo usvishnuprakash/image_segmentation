@@ -12,6 +12,31 @@ export interface modelScaleProps {
   width: number;
 }
 
+export enum clickType {
+  POSITIVE = 1.0,
+  NEGATIVE = 0.0,
+  UPPER_LEFT = 2.0,
+  BOTTOM_RIGHT = 3.0,
+}
+
+export interface multiMaskModelScaleProps {
+  onnxScale: number;
+  maskWidth: number;
+  maskHeight: number;
+  scale: number;
+  uploadScale: number;
+  width: number;
+  height: number;
+}
+
+export interface modelInputProps {
+  x: number;
+  y: number;
+  width: null | number;
+  height: null | number;
+  clickType: number;
+}
+
 export interface modelInputProps {
   x: number;
   y: number;
@@ -26,4 +51,14 @@ export interface modeDataProps {
 
 export interface ToolProps {
   handleMouseMove: (e: any) => void;
+  handleSelectOnClick: (e: any) => void;
+}
+export interface multiMaskModelDataProps {
+  clicks?: Array<modelInputProps>;
+  tensor: Tensor;
+  modelScale: multiMaskModelScaleProps;
+  best_box?: number[];
+  point_coords?: Array<number[]>;
+  point_labels?: number[];
+  last_pred_mask: Tensor | null;
 }

@@ -6,12 +6,22 @@
 
 import * as React from "react";
 import { createRoot } from "react-dom/client";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import AppContextProvider from "./components/hooks/context";
 import App from "./App";
+import ErrorPage from "./ErrorPage";
+
 const container = document.getElementById("root");
 const root = createRoot(container!);
+const router = createBrowserRouter([
+  {
+    path: "*",
+    element: <App />,
+    errorElement: <ErrorPage />,
+  },
+]);
 root.render(
   <AppContextProvider>
-    <App/>
+    <RouterProvider router={router} />
   </AppContextProvider>
 );

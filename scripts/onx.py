@@ -12,21 +12,21 @@ from onnxruntime.quantization import QuantType
 from onnxruntime.quantization.quantize import quantize_dynamic
 
 
-def show_anns(anns):
-    if len(anns) == 0:
-        return
-    sorted_anns = sorted(anns, key=(lambda x: x['area']), reverse=True)
-    ax = plt.gca()
-    ax.set_autoscale_on(False)
+# def show_anns(anns):
+# if len(anns) == 0:
+#     return
+# sorted_anns = sorted(anns, key=(lambda x: x['area']), reverse=True)
+# ax = plt.gca()
+# ax.set_autoscale_on(False)
 
-    img = np.ones((sorted_anns[0]['segmentation'].shape[0],
-                  sorted_anns[0]['segmentation'].shape[1], 4))
-    img[:, :, 3] = 0
-    for ann in sorted_anns:
-        m = ann['segmentation']
-        color_mask = np.concatenate([np.random.random(3), [0.35]])
-        img[m] = color_mask
-    ax.imshow(img)
+# img = np.ones((sorted_anns[0]['segmentation'].shape[0],
+#               sorted_anns[0]['segmentation'].shape[1], 4))
+# img[:, :, 3] = 0
+# for ann in sorted_anns:
+#     m = ann['segmentation']
+#     color_mask = np.concatenate([np.random.random(3), [0.35]])
+#     img[m] = color_mask
+# ax.imshow(img)
 
 
 image = cv2.imread('personalData/spat_image.png')
@@ -53,6 +53,7 @@ sam.to(device=device)
 predictor = SamPredictor(sam)
 predictor.set_image(image)
 image_embedding = predictor.get_image_embedding().cpu().numpy()
+
 np.save("testing_embedding.npy", image_embedding)
 
 mask_generator = SamAutomaticMaskGenerator(sam)
@@ -60,19 +61,11 @@ mask_generator = SamAutomaticMaskGenerator(sam)
 masks = mask_generator.generate(image)
 
 
-print(len(masks))
-print(masks[0].keys())
-
-plt.figure(figsize=(20, 20))
-plt.imshow(image)
-show_anns(masks)
-plt.axis('off')
-plt.show()
-
-
 onnx_model_path = "sam_onnx_example.onnx"
 
-onnx_model = SamOnnxModel(sam, return_single_mask=False)
+onnx_model = SamOnnxModel(sam, return_single_mask=False,
+                          use_stability_score=True, return_extra_metrics=True)
+
 
 dynamic_axes = {
     "point_coords": {1: "num_points"},
@@ -90,8 +83,8 @@ dummy_inputs = {
     "has_mask_input": torch.tensor([1], dtype=torch.float),
     "orig_im_size": torch.tensor([1500, 2250], dtype=torch.float),
 }
-output_names = ["masks", "iou_predictions", "low_res_masks"]
-
+# output_names = ["masks", "iou_predictions", "low_res_masks"]
+# output_names = ["areas", "uncertain_ious", "ious"]
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=torch.jit.TracerWarning)
@@ -106,7 +99,6 @@ with warnings.catch_warnings():
             opset_version=17,
             do_constant_folding=True,
             input_names=list(dummy_inputs.keys()),
-            output_names=output_names,
             dynamic_axes=dynamic_axes,
         )
 
